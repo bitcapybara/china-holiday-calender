@@ -1,0 +1,43 @@
+name: Sync iCloud Calendar
+
+on:
+  schedule:
+    # Run at 08:00 UTC (16:00 CST) on the 1st of every month
+    - cron: "0 8 1 * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run sync script
+        run: python3 scripts/sync_calendar.py --output holidayCal.ics
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet holidayCal.ics; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push if changed
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add holidayCal.ics
+          git commit -m "chore: sync iCloud calendar $(date -u +'%Y-%m-%d')"
+          git push
